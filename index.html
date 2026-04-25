@@ -1,0 +1,805 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Inference Capacity Planner — Paralleliq</title>
+
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-KSJPQGBGST"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-KSJPQGBGST');
+  </script>
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --purple: #7B35D4;
+      --blue:   #4A6CF7;
+      --cyan:   #00C4C4;
+      --bg:     #0a0a1a;
+      --card:   #111128;
+      --card2:  #16163a;
+      --text:   #e8eaf6;
+      --muted:  #8b8fad;
+      --border: #1e2048;
+      --radius: 12px;
+      --green:  #4ade80;
+      --yellow: #fbbf24;
+      --red:    #f87171;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 48px 16px 80px;
+    }
+
+    header { text-align: center; margin-bottom: 40px; }
+    header img { height: 52px; margin-bottom: 24px; }
+    header h1 { font-size: 2rem; font-weight: 700; color: var(--text); margin-bottom: 10px; }
+    header p { font-size: 1.05rem; color: var(--muted); max-width: 580px; line-height: 1.6; }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 36px 40px;
+      width: 100%;
+      max-width: 780px;
+      box-shadow: 0 4px 40px rgba(0,0,0,0.4);
+    }
+
+    .section-title {
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 14px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .form-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
+    .form-grid.three { grid-template-columns: 1fr 1fr 1fr; }
+
+    .field { display: flex; flex-direction: column; gap: 6px; }
+    .field.full { grid-column: 1 / -1; }
+
+    label {
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .label-hint {
+      font-size: 0.75rem;
+      font-weight: 400;
+      color: var(--muted);
+      text-transform: none;
+      letter-spacing: 0;
+      opacity: 0.7;
+      margin-left: 6px;
+    }
+
+    input, select {
+      padding: 11px 36px 11px 14px;
+      border: 1.5px solid var(--border);
+      border-radius: 8px;
+      font-size: 0.97rem;
+      color: var(--text);
+      background: var(--card2);
+      transition: border-color 0.2s;
+      appearance: none;
+      -webkit-appearance: none;
+      width: 100%;
+      cursor: pointer;
+    }
+
+    input { padding-right: 14px; }
+    input:focus, select:focus { outline: none; border-color: var(--blue); }
+
+    .select-wrap { position: relative; }
+    .select-wrap::after {
+      content: "▾";
+      position: absolute;
+      right: 12px; top: 50%;
+      transform: translateY(-50%);
+      color: var(--muted);
+      pointer-events: none;
+      font-size: 0.85rem;
+    }
+
+    .suffix-wrap { position: relative; }
+    .suffix-wrap input { padding-right: 48px; }
+    .suffix-wrap .suffix {
+      position: absolute;
+      right: 12px; top: 50%;
+      transform: translateY(-50%);
+      color: var(--muted);
+      font-size: 0.82rem;
+      pointer-events: none;
+    }
+
+    .incompatible-note {
+      font-size: 0.8rem;
+      color: var(--yellow);
+      margin-top: 4px;
+      display: none;
+    }
+
+    .calc-btn {
+      width: 100%;
+      padding: 14px;
+      border: none;
+      border-radius: 8px;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      background: linear-gradient(90deg, var(--purple), var(--blue), var(--cyan));
+      color: #fff;
+      letter-spacing: 0.02em;
+      transition: opacity 0.2s, transform 0.1s;
+      margin-top: 8px;
+    }
+    .calc-btn:hover { opacity: 0.92; }
+    .calc-btn:active { transform: scale(0.99); }
+
+    /* ── Results ── */
+    #results { margin-top: 32px; display: none; }
+
+    .divider { border: none; border-top: 1px solid var(--border); margin-bottom: 28px; opacity: 0.5; }
+
+    .headline-metric { margin-bottom: 24px; }
+    .results-label { font-size: 0.82rem; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px; }
+
+    .big-number {
+      font-size: 2.6rem;
+      font-weight: 800;
+      background: linear-gradient(90deg, var(--purple), var(--blue), var(--cyan));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      line-height: 1.1;
+      margin-bottom: 4px;
+    }
+
+    .big-sub { font-size: 0.9rem; color: var(--muted); }
+
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      margin-bottom: 28px;
+    }
+
+    .summary-item {
+      background: var(--card2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px 12px;
+      text-align: center;
+    }
+
+    .si-value { font-size: 1.1rem; font-weight: 700; color: var(--text); margin-bottom: 4px; }
+    .si-label { font-size: 0.73rem; color: var(--muted); line-height: 1.3; }
+    .si-value.green  { color: var(--green); }
+    .si-value.yellow { color: var(--yellow); }
+    .si-value.cyan   { color: var(--cyan); }
+
+    /* ── Scale table ── */
+    .breakdown-title { font-size: 0.82rem; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 12px; }
+
+    .breakdown-table { width: 100%; border-collapse: collapse; margin-bottom: 28px; font-size: 0.88rem; }
+    .breakdown-table th { text-align: left; font-size: 0.75rem; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; padding: 8px 10px; border-bottom: 1px solid var(--border); }
+    .breakdown-table td { padding: 10px 10px; border-bottom: 1px solid rgba(30,32,72,0.5); vertical-align: middle; }
+    .breakdown-table tr:last-child td { border-bottom: none; }
+    .breakdown-table tr.highlight td { background: rgba(74,108,247,0.06); }
+
+    .tag {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 0.72rem;
+      font-weight: 700;
+    }
+    .tag.base    { background: rgba(74,108,247,0.15); color: var(--blue); }
+    .tag.double  { background: rgba(251,191,36,0.12); color: var(--yellow); }
+    .tag.five    { background: rgba(248,113,113,0.12); color: var(--red); }
+
+    /* ── API comparison ── */
+    .api-table { width: 100%; border-collapse: collapse; margin-bottom: 28px; font-size: 0.88rem; }
+    .api-table th { text-align: left; font-size: 0.75rem; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; padding: 8px 10px; border-bottom: 1px solid var(--border); }
+    .api-table td { padding: 10px 10px; border-bottom: 1px solid rgba(30,32,72,0.5); vertical-align: middle; }
+    .api-table tr:last-child td { border-bottom: none; }
+
+    .cheaper { color: var(--green); font-weight: 600; }
+    .pricier  { color: var(--red);   font-weight: 600; }
+
+    /* ── Signal box ── */
+    .signal-box {
+      background: linear-gradient(135deg, rgba(123,53,212,0.12), rgba(0,196,196,0.08));
+      border: 1px solid rgba(74,108,247,0.25);
+      border-radius: 8px;
+      padding: 16px 18px;
+      margin-bottom: 20px;
+      font-size: 0.9rem;
+      color: var(--text);
+      line-height: 1.6;
+    }
+    .signal-box strong { color: var(--cyan); }
+
+    /* ── Share ── */
+    .share-row { display: flex; gap: 10px; margin-bottom: 20px; }
+    .share-btn {
+      background: transparent;
+      border: 1.5px solid var(--border);
+      color: var(--muted);
+      font-size: 0.88rem;
+      font-weight: 600;
+      padding: 10px 16px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .share-btn:hover { border-color: var(--cyan); color: var(--cyan); }
+    .share-btn.copied { border-color: var(--green); color: var(--green); }
+
+    /* ── Lead capture ── */
+    .lead-section {
+      background: linear-gradient(135deg, rgba(74,108,247,0.10), rgba(0,196,196,0.06));
+      border: 1px solid rgba(74,108,247,0.3);
+      border-radius: 8px;
+      padding: 18px;
+      margin-bottom: 20px;
+    }
+    .lead-section p { font-size: 0.88rem; color: var(--muted); margin-bottom: 12px; line-height: 1.5; }
+    .lead-section p strong { color: var(--text); }
+    .lead-input-row { display: flex; gap: 8px; }
+    .lead-input-row input { padding: 10px 14px; flex: 1; font-size: 0.9rem; }
+    .lead-submit-btn {
+      width: auto; padding: 10px 18px; font-size: 0.88rem; white-space: nowrap;
+      flex-shrink: 0; border: none; border-radius: 8px; font-weight: 700; cursor: pointer;
+      background: linear-gradient(90deg, var(--purple), var(--blue)); color: #fff; transition: opacity 0.2s;
+    }
+    .lead-submit-btn:hover { opacity: 0.88; }
+    .lead-success { font-size: 0.88rem; color: var(--green); margin-top: 10px; display: none; }
+    .lead-error   { font-size: 0.88rem; color: var(--red);   margin-top: 10px; display: none; }
+
+    .caveat {
+      font-size: 0.78rem; color: var(--muted); line-height: 1.55;
+      margin-bottom: 20px; padding: 10px 14px; border-left: 2px solid var(--border);
+    }
+
+    footer { margin-top: 48px; font-size: 0.8rem; color: var(--muted); text-align: center; }
+    footer a { color: var(--blue); text-decoration: none; }
+
+    @media (max-width: 600px) {
+      .card { padding: 24px 16px; }
+      .form-grid, .form-grid.three { grid-template-columns: 1fr; }
+      .summary-grid { grid-template-columns: 1fr 1fr; }
+      .lead-input-row { flex-direction: column; }
+      .lead-submit-btn { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <img src="logo.png" alt="Paralleliq" />
+    <h1>Inference Capacity Planner</h1>
+    <p>Enter your traffic profile and model. Get the GPU count, cost, and a comparison against serverless API pricing — so you know when to self-host.</p>
+  </header>
+
+  <div class="card">
+
+    <!-- Section 1: Model & Hardware -->
+    <div class="section-title">Model &amp; Hardware</div>
+    <div class="form-grid" style="margin-bottom:8px;">
+      <div class="field">
+        <label>Model Size</label>
+        <div class="select-wrap">
+          <select id="modelSize" onchange="onInput()">
+            <option value="7b">7B (e.g. Llama 3 8B, Mistral 7B)</option>
+            <option value="13b">13B (e.g. Llama 2 13B)</option>
+            <option value="30b">30B – 40B (e.g. Llama 3 70B Q4)</option>
+            <option value="70b" selected>70B (e.g. Llama 3 70B, Mixtral 8x7B)</option>
+            <option value="180b">180B+ (e.g. Llama 3 405B, Mixtral 8x22B)</option>
+          </select>
+        </div>
+      </div>
+      <div class="field">
+        <label>GPU Type</label>
+        <div class="select-wrap">
+          <select id="gpuType" onchange="onInput()">
+            <option value="t4">NVIDIA T4 (16 GB)</option>
+            <option value="l4">NVIDIA L4 (24 GB)</option>
+            <option value="a10">NVIDIA A10 (48 GB)</option>
+            <option value="a100-40">NVIDIA A100 40 GB</option>
+            <option value="a100-80" selected>NVIDIA A100 80 GB</option>
+            <option value="h100">NVIDIA H100 80 GB</option>
+            <option value="h200">NVIDIA H200 141 GB</option>
+            <option value="mi300x">AMD MI300X 192 GB</option>
+          </select>
+        </div>
+        <span class="incompatible-note" id="incompatNote">⚠ This GPU cannot fit the selected model — choose a larger GPU.</span>
+      </div>
+    </div>
+    <div class="form-grid" style="margin-bottom:28px;">
+      <div class="field">
+        <label>Inference Engine</label>
+        <div class="select-wrap">
+          <select id="engine" onchange="onInput()">
+            <option value="vllm" selected>vLLM (continuous batching)</option>
+            <option value="tgi">TGI (Hugging Face)</option>
+            <option value="tensorrt">TensorRT-LLM</option>
+          </select>
+        </div>
+      </div>
+      <div class="field">
+        <label>Cloud Provider</label>
+        <div class="select-wrap">
+          <select id="provider" onchange="onInput()">
+            <option value="gcp" selected>Google Cloud (GCP)</option>
+            <option value="aws">Amazon Web Services (AWS)</option>
+            <option value="azure">Microsoft Azure</option>
+            <option value="coreweave">CoreWeave</option>
+            <option value="lambda">Lambda Labs</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- Section 2: Traffic Profile -->
+    <div class="section-title">Traffic Profile</div>
+    <div class="form-grid three" style="margin-bottom:16px;">
+      <div class="field">
+        <label>Requests / Second <span class="label-hint">(peak)</span></label>
+        <div class="suffix-wrap">
+          <input type="number" id="rps" value="10" min="0.1" step="0.1" oninput="onInput()" />
+          <span class="suffix">RPS</span>
+        </div>
+      </div>
+      <div class="field">
+        <label>Avg Output Tokens <span class="label-hint">(per request)</span></label>
+        <div class="suffix-wrap">
+          <input type="number" id="outputTokens" value="256" min="1" oninput="onInput()" />
+          <span class="suffix">tok</span>
+        </div>
+      </div>
+      <div class="field">
+        <label>Spare Capacity <span class="label-hint">(headroom)</span></label>
+        <div class="select-wrap">
+          <select id="headroom" onchange="onInput()">
+            <option value="10">10% — lean</option>
+            <option value="25" selected>25% — standard</option>
+            <option value="40">40% — conservative</option>
+            <option value="50">50% — high availability</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <button class="calc-btn" onclick="calculate()">Plan My Capacity</button>
+
+    <!-- Results -->
+    <div id="results">
+      <hr class="divider" style="margin-top:32px;" />
+
+      <div class="headline-metric">
+        <div class="results-label">GPUs Required at Peak</div>
+        <div class="big-number" id="totalGpus">—</div>
+        <div class="big-sub" id="gpuSub">—</div>
+      </div>
+
+      <div class="summary-grid">
+        <div class="summary-item">
+          <div class="si-value" id="sumReplicas">—</div>
+          <div class="si-label">Replicas needed</div>
+        </div>
+        <div class="summary-item">
+          <div class="si-value cyan" id="sumThroughput">—</div>
+          <div class="si-label">Output tokens / sec capacity</div>
+        </div>
+        <div class="summary-item">
+          <div class="si-value" id="sumAnnualCost">—</div>
+          <div class="si-label">Est. annual GPU cost</div>
+        </div>
+        <div class="summary-item">
+          <div class="si-value yellow" id="sumCostPerM">—</div>
+          <div class="si-label">Cost per 1M output tokens</div>
+        </div>
+      </div>
+
+      <!-- Scale-out projections -->
+      <div class="breakdown-title">Scale-Out Projections</div>
+      <table class="breakdown-table">
+        <thead>
+          <tr>
+            <th>Traffic Scenario</th>
+            <th>RPS</th>
+            <th>Replicas</th>
+            <th>Total GPUs</th>
+            <th>Annual Cost</th>
+            <th>Cost / 1M tokens</th>
+          </tr>
+        </thead>
+        <tbody id="scaleBody"></tbody>
+      </table>
+
+      <!-- API cost comparison -->
+      <div class="breakdown-title">Self-Hosted vs. Serverless API</div>
+      <table class="api-table">
+        <thead>
+          <tr>
+            <th>Option</th>
+            <th>Monthly Cost</th>
+            <th>Annual Cost</th>
+            <th>Cost / 1M tokens</th>
+            <th>vs. Self-Hosted</th>
+          </tr>
+        </thead>
+        <tbody id="apiBody"></tbody>
+      </table>
+
+      <div class="signal-box" id="signalBox"></div>
+
+      <!-- Share -->
+      <div class="share-row">
+        <button class="share-btn" id="shareBtn" onclick="copyShareLink()">🔗 Copy shareable link</button>
+      </div>
+
+      <!-- Lead capture -->
+      <div class="lead-section">
+        <p><strong>Want an exact capacity plan for your workload?</strong><br/>Enter your email and we'll send a detailed plan with benchmarked throughput numbers for your model and GPU combo.</p>
+        <div class="lead-input-row">
+          <input type="email" id="leadEmail" placeholder="you@company.com" />
+          <button class="lead-submit-btn" onclick="submitLead()">Send Plan</button>
+        </div>
+        <div class="lead-success" id="leadSuccess">✓ Sent! Check your inbox.</div>
+        <div class="lead-error"   id="leadError">Something went wrong — email us at info@paralleliq.ai</div>
+      </div>
+
+      <button class="calc-btn" onclick="window.location.href='https://github.com/paralleliq/piqc'">
+        Validate with a Free Cluster Scan
+      </button>
+
+      <div class="caveat" style="margin-top:16px;">
+        * Throughput estimates assume vLLM-style continuous batching at ~70% GPU utilization. Actual numbers vary
+        by batch size, sequence length, and quantization. Benchmark your specific workload before committing to hardware.
+        GPU prices are on-demand estimates and may differ from reserved/spot pricing.
+      </div>
+    </div>
+
+  </div>
+
+  <footer>
+    <p>Built by <a href="https://paralleliq.ai" target="_blank">Paralleliq</a> · <a href="mailto:info@paralleliq.ai">info@paralleliq.ai</a></p>
+  </footer>
+
+  <script>
+    // ── GPU VRAM (GB) ──────────────────────────────────────────────────────
+    const GPU_VRAM = {
+      t4: 16, l4: 24, a10: 48, 'a100-40': 40, 'a100-80': 80, h100: 80, h200: 141, mi300x: 192,
+    };
+
+    const GPU_NAMES = {
+      t4: 'T4 (16GB)', l4: 'L4 (24GB)', a10: 'A10 (48GB)',
+      'a100-40': 'A100 40GB', 'a100-80': 'A100 80GB',
+      h100: 'H100 80GB', h200: 'H200 141GB', mi300x: 'MI300X 192GB',
+    };
+
+    // ── Model VRAM requirements FP16 (GB) ─────────────────────────────────
+    const MODEL_VRAM = { '7b': 14, '13b': 26, '30b': 60, '70b': 140, '180b': 360 };
+
+    // GPUs per replica = ceil(model_vram / gpu_vram)
+    function gpusPerReplica(model, gpu) {
+      return Math.ceil(MODEL_VRAM[model] / GPU_VRAM[gpu]);
+    }
+
+    function isCompatible(model, gpu) {
+      // Practical limit: we support up to 8-GPU replicas
+      return gpusPerReplica(model, gpu) <= 8;
+    }
+
+    // ── Output tokens/sec per REPLICA (vLLM baseline) ─────────────────────
+    // Base throughput for a single A100-80 running a 7B model
+    // Scaled by GPU compute factor and model size factor.
+    const GPU_COMPUTE = {
+      t4: 0.18, l4: 0.32, a10: 0.52,
+      'a100-40': 0.72, 'a100-80': 1.0,
+      h100: 1.85, h200: 2.60, mi300x: 2.20,
+    };
+
+    // Model efficiency: larger models have lower tokens/sec/GPU due to memory bandwidth
+    const MODEL_EFFICIENCY = { '7b': 1.0, '13b': 0.60, '30b': 0.32, '70b': 0.18, '180b': 0.10 };
+
+    // Engine multiplier (TensorRT-LLM is fastest, TGI is slightly slower than vLLM)
+    const ENGINE_FACTOR = { vllm: 1.0, tgi: 0.85, tensorrt: 1.35 };
+
+    // Base throughput: A100-80 single GPU, 7B model, vLLM → ~1200 output tok/s
+    const BASE_THROUGHPUT = 1200;
+
+    function throughputPerReplica(model, gpu, engine) {
+      const gpus = gpusPerReplica(model, gpu);
+      // Multi-GPU scaling is sublinear (NVLink/NVSwitch helps, but coordination overhead exists)
+      const multiGpuScale = gpus === 1 ? 1.0 : gpus === 2 ? 1.75 : gpus === 4 ? 3.2 : 5.5;
+      return Math.round(
+        BASE_THROUGHPUT
+        * GPU_COMPUTE[gpu]
+        * MODEL_EFFICIENCY[model]
+        * ENGINE_FACTOR[engine]
+        * multiGpuScale
+      );
+    }
+
+    // ── Pricing ($/hr per GPU, on-demand) ─────────────────────────────────
+    const PRICES = {
+      gcp:       { t4: 0.35, l4: 0.54, a10: 0.90, 'a100-40': 2.21, 'a100-80': 3.06, h100: 3.50, h200: 5.00, mi300x: 4.50 },
+      aws:       { t4: 0.53, l4: 0.81, a10: 1.01, 'a100-40': 3.21, 'a100-80': 4.10, h100: 5.12, h200: 6.50, mi300x: 5.00 },
+      azure:     { t4: 0.53, l4: 0.60, a10: 1.10, 'a100-40': 3.40, 'a100-80': 3.67, h100: 5.80, h200: 7.00, mi300x: 5.20 },
+      coreweave: { t4: 0.28, l4: 0.44, a10: 0.85, 'a100-40': 2.06, 'a100-80': 2.76, h100: 2.95, h200: 4.25, mi300x: 3.80 },
+      lambda:    { t4: 0.30, l4: 0.50, a10: 0.75, 'a100-40': 1.99, 'a100-80': 2.50, h100: 2.49, h200: 3.90, mi300x: 3.50 },
+    };
+
+    // ── Serverless API pricing ($/1M output tokens, approximate) ──────────
+    const API_PRICING = {
+      '7b':  { 'Together.ai': 0.18, 'Fireworks AI': 0.20, 'Groq':  0.08 },
+      '13b': { 'Together.ai': 0.30, 'Fireworks AI': 0.35, 'Groq':  0.20 },
+      '30b': { 'Together.ai': 0.90, 'Fireworks AI': 0.90, 'Groq':  null },
+      '70b': { 'Together.ai': 0.88, 'Fireworks AI': 0.90, 'Groq':  0.59 },
+      '180b':{ 'Together.ai': 3.50, 'Fireworks AI': 3.50, 'Groq':  null },
+    };
+
+    // ── Helpers ────────────────────────────────────────────────────────────
+    function fmtDollars(n) {
+      if (n >= 1e6) return `$${(n/1e6).toFixed(2)}M`;
+      if (n >= 1e3) return `$${Math.round(n).toLocaleString()}`;
+      return `$${Math.round(n)}`;
+    }
+
+    function fmtNum(n) {
+      if (n >= 1e6) return `${(n/1e6).toFixed(1)}M`;
+      if (n >= 1e3) return `${(n/1e3).toFixed(1)}K`;
+      return `${Math.round(n)}`;
+    }
+
+    // ── Core calculation ───────────────────────────────────────────────────
+    function computePlan(rps, outputTok, headroomPct, model, gpu, engine, provider) {
+      const tps            = rps * outputTok;                     // tokens/sec demanded
+      const tpr            = throughputPerReplica(model, gpu, engine);
+      const gpusPerRep     = gpusPerReplica(model, gpu);
+      const replicasRaw    = Math.ceil(tps / tpr);
+      const headroomFactor = 1 / (1 - headroomPct / 100);
+      const replicas       = Math.max(1, Math.ceil(replicasRaw * headroomFactor));
+      const totalGpus      = replicas * gpusPerRep;
+      const hourlyPerGpu   = PRICES[provider][gpu] || 0;
+      const hourlyTotal    = hourlyPerGpu * totalGpus;
+      const annualCost     = hourlyTotal * 8760;
+      const monthlyTokens  = rps * outputTok * 60 * 60 * 24 * 30;
+      const annualTokens   = monthlyTokens * 12;
+      const costPerM       = annualTokens > 0 ? (annualCost / (annualTokens / 1e6)) : 0;
+      const capacityTps    = replicas * tpr;
+
+      return { tps, tpr, gpusPerRep, replicas, totalGpus, hourlyTotal, annualCost, monthlyTokens, annualTokens, costPerM, capacityTps };
+    }
+
+    // ── Main calculate ─────────────────────────────────────────────────────
+    function calculate() {
+      const model    = document.getElementById('modelSize').value;
+      const gpu      = document.getElementById('gpuType').value;
+      const engine   = document.getElementById('engine').value;
+      const provider = document.getElementById('provider').value;
+      const rps      = parseFloat(document.getElementById('rps').value) || 1;
+      const outTok   = parseInt(document.getElementById('outputTokens').value) || 256;
+      const headroom = parseInt(document.getElementById('headroom').value) || 25;
+
+      if (!isCompatible(model, gpu)) return;
+
+      const plan = computePlan(rps, outTok, headroom, model, gpu, engine, provider);
+
+      // ── Headline ──
+      document.getElementById('totalGpus').textContent = plan.totalGpus;
+      document.getElementById('gpuSub').textContent =
+        `${plan.replicas} replica${plan.replicas !== 1 ? 's' : ''} × ${plan.gpusPerRep} × ${GPU_NAMES[gpu]}  ·  ${fmtNum(plan.capacityTps)} output tok/s capacity`;
+
+      document.getElementById('sumReplicas').textContent    = plan.replicas;
+      document.getElementById('sumThroughput').textContent  = fmtNum(plan.capacityTps) + '/s';
+      document.getElementById('sumAnnualCost').textContent  = fmtDollars(plan.annualCost) + '/yr';
+      document.getElementById('sumCostPerM').textContent    = plan.costPerM < 0.01 ? '<$0.01' : `$${plan.costPerM.toFixed(2)}`;
+
+      // ── Scale table ──
+      const scenarios = [
+        { label: 'Current (baseline)', multiplier: 1, tag: 'base' },
+        { label: '2× traffic spike',   multiplier: 2, tag: 'double' },
+        { label: '5× growth',          multiplier: 5, tag: 'five' },
+      ];
+
+      const scaleRows = scenarios.map(s => {
+        const p = computePlan(rps * s.multiplier, outTok, headroom, model, gpu, engine, provider);
+        return `
+          <tr class="${s.tag === 'base' ? 'highlight' : ''}">
+            <td><span class="tag ${s.tag}">${s.tag === 'base' ? 'NOW' : s.tag === 'double' ? '2×' : '5×'}</span>  ${s.label}</td>
+            <td>${(rps * s.multiplier).toFixed(1)}</td>
+            <td>${p.replicas}</td>
+            <td>${p.totalGpus}</td>
+            <td>${fmtDollars(p.annualCost)}/yr</td>
+            <td>$${p.costPerM.toFixed(2)}/M</td>
+          </tr>
+        `;
+      });
+      document.getElementById('scaleBody').innerHTML = scaleRows.join('');
+
+      // ── API comparison ──
+      const apiData = API_PRICING[model] || {};
+      const selfHostedRow = `
+        <tr class="highlight">
+          <td><strong>Self-hosted</strong> (${GPU_NAMES[gpu]} on ${provider.toUpperCase()})</td>
+          <td>${fmtDollars(plan.annualCost / 12)}/mo</td>
+          <td>${fmtDollars(plan.annualCost)}/yr</td>
+          <td>$${plan.costPerM.toFixed(2)}/M</td>
+          <td>—</td>
+        </tr>
+      `;
+
+      const apiRows = Object.entries(apiData).map(([name, pricePerM]) => {
+        if (!pricePerM) return `<tr><td>${name}</td><td colspan="3" style="color:var(--muted)">Not available for this model size</td><td>—</td></tr>`;
+        const annualApi  = (plan.annualTokens / 1e6) * pricePerM;
+        const monthlyApi = annualApi / 12;
+        const diff       = annualApi - plan.annualCost;
+        const pct        = plan.annualCost > 0 ? Math.abs(diff / plan.annualCost * 100) : 0;
+        const cheaper    = diff > 0;
+        const diffStr    = cheaper
+          ? `<span class="cheaper">Self-host saves ${fmtDollars(diff)}/yr (${pct.toFixed(0)}% cheaper)</span>`
+          : `<span class="pricier">API saves ${fmtDollars(-diff)}/yr (${pct.toFixed(0)}% cheaper)</span>`;
+        return `
+          <tr>
+            <td>${name}</td>
+            <td>${fmtDollars(monthlyApi)}/mo</td>
+            <td>${fmtDollars(annualApi)}/yr</td>
+            <td>$${pricePerM.toFixed(2)}/M</td>
+            <td>${diffStr}</td>
+          </tr>
+        `;
+      });
+
+      document.getElementById('apiBody').innerHTML = selfHostedRow + apiRows.join('');
+
+      // ── Signal box ──
+      const selfHostCheaper = Object.values(apiData).some(p => p && (plan.annualTokens / 1e6) * p > plan.annualCost);
+      let signal = '';
+      if (plan.annualCost > 500000) {
+        signal = `<strong>At ${fmtNum(plan.tps)} tokens/sec you need ${plan.totalGpus} GPUs.</strong> Annual infrastructure cost of ${fmtDollars(plan.annualCost)} at this scale. A control plane that keeps those GPUs at 70%+ utilization is worth ${fmtDollars(plan.annualCost * 0.35)}/yr in recovered capacity.`;
+      } else if (selfHostCheaper) {
+        signal = `<strong>Self-hosting is cost-competitive at your traffic level.</strong> At ${fmtNum(plan.annualTokens)} tokens/year, ${fmtDollars(plan.annualCost)}/yr beats most serverless API pricing. Operational overhead is the key variable — a control plane handles that automatically.`;
+      } else {
+        signal = `<strong>Serverless APIs may be cheaper at your current traffic level.</strong> Self-hosting breaks even once you scale past ~${fmtNum(plan.tps * 5)} tok/s sustained. Use this planner to track the crossover point as you grow.`;
+      }
+      document.getElementById('signalBox').innerHTML = signal;
+
+      document.getElementById('results').style.display = 'block';
+
+      gtag('event', 'capacity_calculate', {
+        model, gpu, engine, provider,
+        rps, total_gpus: plan.totalGpus,
+        annual_cost: Math.round(plan.annualCost),
+        cost_per_m: Math.round(plan.costPerM * 100) / 100,
+      });
+    }
+
+    // ── Auto-recalculate & compatibility check ─────────────────────────────
+    function onInput() {
+      const model = document.getElementById('modelSize').value;
+      const gpu   = document.getElementById('gpuType').value;
+      const note  = document.getElementById('incompatNote');
+      const btn   = document.querySelector('.calc-btn');
+
+      if (!isCompatible(model, gpu)) {
+        note.style.display = 'block';
+        btn.disabled = true;
+        btn.style.opacity = '0.4';
+      } else {
+        note.style.display = 'none';
+        btn.disabled = false;
+        btn.style.opacity = '';
+      }
+
+      if (document.getElementById('results').style.display !== 'none' && isCompatible(model, gpu)) {
+        calculate();
+      }
+    }
+
+    // ── Shareable URL ──────────────────────────────────────────────────────
+    function copyShareLink() {
+      const params = new URLSearchParams({
+        model:    document.getElementById('modelSize').value,
+        gpu:      document.getElementById('gpuType').value,
+        engine:   document.getElementById('engine').value,
+        provider: document.getElementById('provider').value,
+        rps:      document.getElementById('rps').value,
+        out:      document.getElementById('outputTokens').value,
+        head:     document.getElementById('headroom').value,
+      });
+      const url = `${location.origin}${location.pathname}?${params}`;
+      navigator.clipboard.writeText(url).then(() => {
+        const btn = document.getElementById('shareBtn');
+        btn.textContent = '✓ Copied!';
+        btn.classList.add('copied');
+        setTimeout(() => { btn.textContent = '🔗 Copy shareable link'; btn.classList.remove('copied'); }, 2000);
+      });
+    }
+
+    function loadFromUrl() {
+      const p = new URLSearchParams(location.search);
+      if (!p.has('model')) return false;
+      document.getElementById('modelSize').value       = p.get('model')    || '70b';
+      document.getElementById('gpuType').value         = p.get('gpu')      || 'a100-80';
+      document.getElementById('engine').value          = p.get('engine')   || 'vllm';
+      document.getElementById('provider').value        = p.get('provider') || 'gcp';
+      document.getElementById('rps').value             = p.get('rps')      || '10';
+      document.getElementById('outputTokens').value    = p.get('out')      || '256';
+      document.getElementById('headroom').value        = p.get('head')     || '25';
+      calculate();
+      return true;
+    }
+
+    // ── Lead capture ───────────────────────────────────────────────────────
+    async function submitLead() {
+      const email = document.getElementById('leadEmail').value.trim();
+      if (!email || !email.includes('@')) return;
+
+      const payload = {
+        email,
+        calculator:   'Inference Capacity Planner',
+        model:        document.getElementById('modelSize').value,
+        gpu:          document.getElementById('gpuType').value,
+        engine:       document.getElementById('engine').value,
+        provider:     document.getElementById('provider').value,
+        rps:          document.getElementById('rps').value,
+        output_tokens: document.getElementById('outputTokens').value,
+      };
+
+      try {
+        const resp = await fetch('https://formspree.io/f/xyklnbgy', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        if (resp.ok) {
+          document.getElementById('leadSuccess').style.display = 'block';
+          document.getElementById('leadError').style.display   = 'none';
+          gtag('event', 'lead_capture', { email_domain: email.split('@')[1], calculator: 'capacity' });
+        } else {
+          document.getElementById('leadError').style.display = 'block';
+        }
+      } catch {
+        document.getElementById('leadError').style.display = 'block';
+      }
+    }
+
+    // ── Init ──────────────────────────────────────────────────────────────
+    if (!loadFromUrl()) {
+      calculate();
+    }
+  </script>
+
+</body>
+</html>
