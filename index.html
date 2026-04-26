@@ -432,8 +432,9 @@
         <div class="big-sub" id="gpuSub">—</div>
         <p style="font-size:0.78rem;color:var(--muted);margin-top:8px;line-height:1.6;">
           Assumes a flat 24/7 traffic profile. Real workloads vary by time of day —
-          predictive autoscaling (on our <a href="https://github.com/paralleliq/platform/blob/main/ARCHITECTURE.md" target="_blank" style="color:var(--blue)">roadmap</a>)
-          will optimize fleet size dynamically, reducing costs during off-peak hours.
+          pattern-based predictive autoscaling (on our <a href="https://github.com/paralleliq/platform/blob/main/ARCHITECTURE.md" target="_blank" style="color:var(--blue)">roadmap</a>)
+          learns your traffic patterns from scanner history and pre-warms replicas before spikes hit,
+          reducing costs during off-peak without degradation during ramp-up.
         </p>
       </div>
 
