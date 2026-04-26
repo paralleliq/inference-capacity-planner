@@ -290,6 +290,26 @@
       margin-bottom: 20px; padding: 10px 14px; border-left: 2px solid var(--border);
     }
 
+    /* ── Tooltips ── */
+    .tip-wrap { position: relative; display: inline-block; margin-left: 5px; vertical-align: middle; }
+    .tip-icon {
+      background: none; border: none; padding: 0;
+      font-size: 0.85rem; cursor: pointer; opacity: 0.45;
+      transition: opacity 0.2s; color: var(--muted); line-height: 1;
+    }
+    .tip-icon:hover { opacity: 1; }
+    .tip-body {
+      display: none; position: absolute; left: 0; top: calc(100% + 6px);
+      background: var(--card2); border: 1px solid var(--border);
+      border-radius: 8px; padding: 12px 14px;
+      font-size: 0.78rem; color: var(--muted); line-height: 1.7;
+      white-space: normal; z-index: 30;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.5);
+      min-width: 240px; max-width: 300px;
+      font-weight: 400; text-transform: none; letter-spacing: 0;
+    }
+    .tip-wrap.open .tip-body { display: block; }
+
     footer { margin-top: 48px; font-size: 0.8rem; color: var(--muted); text-align: center; }
     footer a { color: var(--blue); text-decoration: none; }
 
@@ -347,7 +367,7 @@
     </div>
     <div class="form-grid" style="margin-bottom:28px;">
       <div class="field">
-        <label>Inference Engine</label>
+        <label>Inference Engine <span class="tip-wrap"><button class="tip-icon" onclick="toggleTip(this)">ⓘ</button><span class="tip-body">Throughput multiplier vs vLLM baseline:<br/>· vLLM — 1.0× (continuous batching)<br/>· TGI — 0.85× (~15% slower)<br/>· TensorRT-LLM — 1.35× (~35% faster)<br/><br/>Choose the engine you plan to deploy. TensorRT-LLM is fastest but requires compilation per model.</span></span></label>
         <div class="select-wrap">
           <select id="engine" onchange="onInput()">
             <option value="vllm" selected>vLLM (continuous batching)</option>
@@ -374,21 +394,21 @@
     <div class="section-title">Traffic Profile</div>
     <div class="form-grid three" style="margin-bottom:16px;">
       <div class="field">
-        <label>Requests / Second <span class="label-hint">(peak)</span></label>
+        <label>Requests / Second <span class="label-hint">(peak)</span> <span class="tip-wrap"><button class="tip-icon" onclick="toggleTip(this)">ⓘ</button><span class="tip-body">Use your expected peak traffic, not average. Inference clusters must handle bursts — sizing for average load will cause failures during spikes.<br/><br/>If you don't know your peak yet, use 2–3× your expected average as a starting point.</span></span></label>
         <div class="suffix-wrap">
           <input type="number" id="rps" value="10" min="0.1" step="0.1" oninput="onInput()" />
           <span class="suffix">RPS</span>
         </div>
       </div>
       <div class="field">
-        <label>Avg Output Tokens <span class="label-hint">(per request)</span></label>
+        <label>Avg Output Tokens <span class="label-hint">(per request)</span> <span class="tip-wrap"><button class="tip-icon" onclick="toggleTip(this)">ⓘ</button><span class="tip-body">Output tokens (generated) drive throughput demand — each token requires a GPU forward pass.<br/><br/>Input/prompt tokens affect VRAM via KV cache but are processed faster. Typical ranges:<br/>· Chat: 100–300 tokens<br/>· Summarization: 200–500 tokens<br/>· Code generation: 300–1000 tokens</span></span></label>
         <div class="suffix-wrap">
           <input type="number" id="outputTokens" value="256" min="1" oninput="onInput()" />
           <span class="suffix">tok</span>
         </div>
       </div>
       <div class="field">
-        <label>Spare Capacity <span class="label-hint">(headroom)</span></label>
+        <label>Spare Capacity <span class="label-hint">(headroom)</span> <span class="tip-wrap"><button class="tip-icon" onclick="toggleTip(this)">ⓘ</button><span class="tip-body">Buffer above your peak load so traffic spikes don't saturate the cluster:<br/>· 10% — lean, suitable for stable/predictable traffic<br/>· 25% — standard production recommendation<br/>· 40% — conservative, for unpredictable workloads<br/>· 50% — high availability / mission-critical<br/><br/>At 25% headroom your cluster runs at 75% max utilization at peak.</span></span></label>
         <div class="select-wrap">
           <select id="headroom" onchange="onInput()">
             <option value="10">10% — lean</option>
@@ -407,7 +427,7 @@
       <hr class="divider" style="margin-top:32px;" />
 
       <div class="headline-metric">
-        <div class="results-label">GPUs Required at Peak</div>
+        <div class="results-label">GPUs Required at Peak <span class="tip-wrap"><button class="tip-icon" onclick="toggleTip(this)">ⓘ</button><span class="tip-body">Based on a throughput baseline of ~1,200 output tok/s on a single A100-80 running a 7B model with vLLM. Scaled by GPU compute factor, model efficiency, engine multiplier, and headroom.<br/><br/>Multi-GPU scaling is sublinear (1.75× for 2 GPUs, 3.2× for 4). Actual throughput will vary with your workload shape — benchmark before committing.</span></span></div>
         <div class="big-number" id="totalGpus">—</div>
         <div class="big-sub" id="gpuSub">—</div>
       </div>
@@ -423,11 +443,11 @@
         </div>
         <div class="summary-item">
           <div class="si-value" id="sumAnnualCost">—</div>
-          <div class="si-label">Est. annual GPU cost</div>
+          <div class="si-label">Est. annual GPU cost <span class="tip-wrap"><button class="tip-icon" onclick="toggleTip(this)">ⓘ</button><span class="tip-body">Based on on-demand hourly rates for the selected provider. Reserved or spot pricing can reduce this by 30–70%.</span></span></div>
         </div>
         <div class="summary-item">
           <div class="si-value yellow" id="sumCostPerM">—</div>
-          <div class="si-label">Cost per 1M output tokens</div>
+          <div class="si-label">Cost per 1M output tokens <span class="tip-wrap"><button class="tip-icon" onclick="toggleTip(this)">ⓘ</button><span class="tip-body">Annual GPU cost divided by annual output token volume at your stated RPS. Assumes 24/7 operation.<br/><br/>This improves as your utilization increases — idle GPUs raise the effective cost per token.</span></span></div>
         </div>
       </div>
 
@@ -448,7 +468,7 @@
       </table>
 
       <!-- API cost comparison -->
-      <div class="breakdown-title">Self-Hosted vs. Serverless API</div>
+      <div class="breakdown-title">Self-Hosted vs. Serverless API <span class="tip-wrap"><button class="tip-icon" onclick="toggleTip(this)">ⓘ</button><span class="tip-body">API prices are approximate public rates ($/1M output tokens) sourced from provider pricing pages. Prices change frequently — verify before making infrastructure decisions.<br/><br/>Self-hosted cost is on-demand GPU pricing. At reserved pricing self-hosting becomes cheaper at lower traffic volumes.</span></span></div>
       <table class="api-table">
         <thead>
           <tr>
@@ -799,6 +819,19 @@
         document.getElementById('leadError').style.display = 'block';
       }
     }
+
+    // ── Tooltips ──────────────────────────────────────────────────────────
+    function toggleTip(btn) {
+      const wrap = btn.closest('.tip-wrap');
+      const wasOpen = wrap.classList.contains('open');
+      document.querySelectorAll('.tip-wrap.open').forEach(w => w.classList.remove('open'));
+      if (!wasOpen) wrap.classList.add('open');
+    }
+    document.addEventListener('click', function(e) {
+      if (!e.target.closest('.tip-wrap')) {
+        document.querySelectorAll('.tip-wrap.open').forEach(w => w.classList.remove('open'));
+      }
+    });
 
     // ── Init ──────────────────────────────────────────────────────────────
     loadFromUrl();
