@@ -430,6 +430,11 @@
         <div class="results-label">GPUs Required at Peak <span class="tip-wrap"><button class="tip-icon" onclick="toggleTip(this)">ⓘ</button><span class="tip-body">Based on a throughput baseline of ~1,200 output tok/s on a single A100-80 running a 7B model with vLLM. Scaled by GPU compute factor, model efficiency, engine multiplier, and headroom.<br/><br/>Multi-GPU scaling is sublinear (1.75× for 2 GPUs, 3.2× for 4). Actual throughput will vary with your workload shape — benchmark before committing.</span></span></div>
         <div class="big-number" id="totalGpus">—</div>
         <div class="big-sub" id="gpuSub">—</div>
+        <p style="font-size:0.78rem;color:var(--muted);margin-top:8px;line-height:1.6;">
+          Assumes a flat 24/7 traffic profile. Real workloads vary by time of day —
+          predictive autoscaling (on our <a href="https://github.com/paralleliq/platform/blob/main/ARCHITECTURE.md" target="_blank" style="color:var(--blue)">roadmap</a>)
+          will optimize fleet size dynamically, reducing costs during off-peak hours.
+        </p>
       </div>
 
       <div class="summary-grid">
